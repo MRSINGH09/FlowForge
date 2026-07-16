@@ -48,7 +48,3 @@ src/
 ├── types/            # Shared types
 └── lib/              # Utilities
 ```
-
-## Week 1 MVP
-
-All core deliverables are implemented: auth, dashboard, editor, canvas, nodes, connections, configuration, and persistence.
