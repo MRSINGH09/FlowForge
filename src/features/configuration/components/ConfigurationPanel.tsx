@@ -1,0 +1,86 @@
+"use client";
+
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Drawer, DrawerContent, DrawerHeader } from "@/components/drawer";
+import { selectSelectedNode, useCanvasStore } from "@/store/canvasStore";
+import { getNodeDefinition } from "@/features/nodes/utils/nodeRegistry";
+import { ManualTriggerConfigForm } from "@/features/configuration/components/ManualTriggerConfigForm";
+import { WebhookTriggerConfigForm } from "@/features/configuration/components/WebhookTriggerConfigForm";
+import { ScheduleTriggerConfigForm } from "@/features/configuration/components/ScheduleTriggerConfigForm";
+import { HttpConfigForm } from "@/features/configuration/components/HttpConfigForm";
+import { DelayConfigForm } from "@/features/configuration/components/DelayConfigForm";
+import { NotificationConfigForm } from "@/features/configuration/components/NotificationConfigForm";
+import { IfConditionConfigForm } from "@/features/configuration/components/IfConditionConfigForm";
+import type { FlowNode, NodeType } from "@/types";
+
+type ConfigFormComponent = React.ComponentType<{ node: FlowNode }>;
+
+const configForms: Record<NodeType, ConfigFormComponent> = {
+  manualTrigger: ManualTriggerConfigForm,
+  webhookTrigger: WebhookTriggerConfigForm,
+  scheduleTrigger: ScheduleTriggerConfigForm,
+  http: HttpConfigForm,
+  delay: DelayConfigForm,
+  notification: NotificationConfigForm,
+  ifCondition: IfConditionConfigForm,
+};
+
+export function ConfigurationPanel() {
+  const selectedNode = useCanvasStore(selectSelectedNode);
+  const setSelectedNodeId = useCanvasStore((s) => s.setSelectedNodeId);
+  const deleteSelectedNode = useCanvasStore((s) => s.deleteSelectedNode);
+
+  if (!selectedNode) {
+    return (
+      <div className="hidden w-80 shrink-0 flex-col border-l border-border bg-card lg:flex">
+        <div className="flex flex-1 items-center justify-center p-6 text-center">
+          <div>
+            <p className="text-sm font-medium">No node selected</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Select a node on the canvas to configure it
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const definition = getNodeDefinition(selectedNode.data.type);
+  const ConfigComponent = configForms[selectedNode.data.type];
+
+  const categoryVariant =
+    definition.category === "trigger"
+      ? "trigger"
+      : definition.category === "logic"
+        ? "logic"
+        : "action";
+
+  return (
+    <Drawer open className="hidden w-80 shrink-0 lg:flex">
+      <DrawerHeader>
+        <div className="flex items-center gap-2">
+          <Badge variant={categoryVariant}>{definition.category}</Badge>
+          <h3 className="flex-1 truncate text-sm font-semibold">{selectedNode.data.label}</h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setSelectedNodeId(null)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </DrawerHeader>
+      <DrawerContent>
+        <ConfigComponent node={selectedNode} />
+        <div className="mt-6 border-t border-border pt-4">
+          <Button variant="destructive" size="sm" onClick={deleteSelectedNode}>
+            Delete Node
+          </Button>
+        </div>
+      </DrawerContent>
+    </Drawer>
+  );
+}
