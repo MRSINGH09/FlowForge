@@ -57,6 +57,8 @@ export function WorkflowCard({ workflow, onRename, onDuplicate, onDelete }: Work
     try {
       const duplicated = await onDuplicate(workflow.id);
       router.push(ROUTES.WORKFLOW_EDITOR(duplicated.id));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Failed to duplicate workflow");
     } finally {
       setIsLoading(false);
     }
@@ -67,6 +69,8 @@ export function WorkflowCard({ workflow, onRename, onDuplicate, onDelete }: Work
     try {
       await onDelete(workflow.id);
       setDeleteOpen(false);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Failed to delete workflow");
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +126,11 @@ export function WorkflowCard({ workflow, onRename, onDuplicate, onDelete }: Work
             className="cursor-pointer text-sm text-muted-foreground"
             onClick={() => router.push(ROUTES.WORKFLOW_EDITOR(workflow.id))}
           >
-            {workflow.nodes.length} nodes · {workflow.edges.length} connections
+            {workflow.description ? (
+              <p className="line-clamp-2">{workflow.description}</p>
+            ) : (
+              <p>Open to edit canvas</p>
+            )}
           </div>
         </CardContent>
       </Card>

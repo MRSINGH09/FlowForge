@@ -1,6 +1,5 @@
 export const STORAGE_KEYS = {
   AUTH: "flowforge_auth",
-  WORKFLOWS: "flowforge_workflows",
   THEME: "flowforge_theme",
 } as const;
 
@@ -10,6 +9,7 @@ export const ROUTES = {
   LOGIN: "/login",
   SIGNUP: "/signup",
   WORKFLOWS: "/workflows",
+  PROFILE: "/profile",
   WORKFLOW_EDITOR: (id: string) => `/workflows/${id}`,
 } as const;
 

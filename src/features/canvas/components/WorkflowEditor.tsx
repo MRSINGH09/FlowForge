@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { PageLoading } from "@/components/loading-spinner";
 import { ErrorState } from "@/components/error-state";
@@ -9,7 +9,6 @@ import { NodeSidebar, useCanvasDrop } from "@/features/canvas/components/NodeSid
 import { EditorHeader } from "@/features/canvas/components/EditorHeader";
 import { ConfigurationPanel } from "@/features/configuration/components/ConfigurationPanel";
 import { useCanvasStore } from "@/store/canvasStore";
-import { useWorkflowStore } from "@/store/workflowStore";
 import { workflowApi } from "@/features/workflow/api/workflowApi";
 import type { Workflow } from "@/types";
 
@@ -18,36 +17,31 @@ export function WorkflowEditor() {
   const workflowId = params.workflowId as string;
   const initCanvas = useCanvasStore((s) => s.initCanvas);
   const resetCanvas = useCanvasStore((s) => s.resetCanvas);
-  const fetchWorkflows = useWorkflowStore((s) => s.fetchWorkflows);
   const { onDrop, onDragOver } = useCanvasDrop();
 
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
+    hasLoadedRef.current = false;
 
     async function load() {
       setIsLoading(true);
       setError(null);
 
       try {
-        await fetchWorkflows();
-        const data = await workflowApi.getById(workflowId);
-
+        const data = await workflowApi.getCanvas(workflowId);
         if (!mounted) return;
-
-        if (!data) {
-          setError("Workflow not found");
-          return;
-        }
 
         setWorkflow(data);
         initCanvas(data.id, data.name, data.nodes, data.edges, data.viewport);
-      } catch {
+        hasLoadedRef.current = true;
+      } catch (err) {
         if (mounted) {
-          setError("Failed to load workflow");
+          setError(err instanceof Error ? err.message : "Failed to load workflow");
         }
       } finally {
         if (mounted) {
@@ -60,9 +54,24 @@ export function WorkflowEditor() {
 
     return () => {
       mounted = false;
+
+      if (hasLoadedRef.current) {
+        const {
+          workflowId: canvasId,
+          isDirty,
+          nodes,
+          edges,
+          viewport,
+        } = useCanvasStore.getState();
+
+        if (canvasId && isDirty) {
+          void workflowApi.updateCanvas(canvasId, { nodes, edges, viewport });
+        }
+      }
+
       resetCanvas();
     };
-  }, [workflowId, initCanvas, resetCanvas, fetchWorkflows]);
+  }, [workflowId, initCanvas, resetCanvas]);
 
   if (isLoading) {
     return <PageLoading label="Loading workflow..." />;

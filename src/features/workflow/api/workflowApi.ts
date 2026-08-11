@@ -1,95 +1,318 @@
-import { v4 as uuidv4 } from "uuid";
-import type { Workflow } from "@/types";
-import { DEFAULT_VIEWPORT, STORAGE_KEYS } from "@/constants";
-import { getItem, setItem } from "@/lib/storage";
+import axios from "axios";
+import { api } from "@/services/api";
+import { DEFAULT_VIEWPORT } from "@/constants";
+import { getDefaultConfig, getNodeDefinition } from "@/features/nodes/utils/nodeRegistry";
+import type { FlowEdge, FlowNode, NodeType, ViewportState, Workflow } from "@/types";
 
-function getWorkflows(): Workflow[] {
-  return getItem<Workflow[]>(STORAGE_KEYS.WORKFLOWS) ?? [];
+export interface CanvasJson {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  viewport: ViewportState;
 }
 
-function saveWorkflows(workflows: Workflow[]): void {
-  setItem(STORAGE_KEYS.WORKFLOWS, workflows);
+interface BackendWorkflow {
+  id: string | number;
+  name: string;
+  description?: string | null;
+  canvas_json?: CanvasJson | string | null;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface ListWorkflowsResponse {
+  success: boolean;
+  data: BackendWorkflow[];
+  message?: string;
+}
+
+interface CreateWorkflowResponse {
+  success: boolean;
+  message?: string;
+  data: BackendWorkflow;
+}
+
+interface GetCanvasResponse {
+  success: boolean;
+  data?: BackendWorkflow;
+  message?: string;
+}
+
+interface UpdateCanvasResponse {
+  success: boolean;
+  message?: string;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as
+      | {
+          error?: string | { issues?: Array<{ message?: string }> };
+          message?: string;
+        }
+      | undefined;
+
+    if (typeof data?.error === "string") {
+      return data.error;
+    }
+
+    const firstIssue =
+      data?.error && typeof data.error === "object"
+        ? data.error.issues?.[0]?.message
+        : undefined;
+    if (firstIssue) {
+      return firstIssue;
+    }
+
+    if (typeof data?.message === "string") {
+      return data.message;
+    }
+
+    return error.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function isNodeType(value: unknown): value is NodeType {
+  return (
+    typeof value === "string" &&
+    [
+      "manualTrigger",
+      "webhookTrigger",
+      "scheduleTrigger",
+      "http",
+      "delay",
+      "notification",
+      "ifCondition",
+    ].includes(value)
+  );
+}
+
+function normalizeFlowNode(raw: FlowNode): FlowNode {
+  const typeCandidate = raw.data?.type ?? raw.type;
+  const type: NodeType = isNodeType(typeCandidate) ? typeCandidate : "manualTrigger";
+  const definition = getNodeDefinition(type);
+  const defaults = getDefaultConfig(type);
+  const existingConfig =
+    raw.data?.config && typeof raw.data.config === "object" ? raw.data.config : {};
+
+  return {
+    ...raw,
+    id: String(raw.id),
+    type,
+    position: {
+      x: Number(raw.position?.x ?? 0),
+      y: Number(raw.position?.y ?? 0),
+    },
+    data: {
+      label: String(raw.data?.label ?? definition.label),
+      type,
+      config: { ...defaults, ...existingConfig },
+    },
+  };
+}
+
+function parseCanvasJson(raw: BackendWorkflow["canvas_json"]): CanvasJson {
+  let parsed: unknown = raw;
+
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+  }
+
+  const canvas = (parsed ?? {}) as Partial<CanvasJson>;
+
+  return {
+    nodes: Array.isArray(canvas.nodes)
+      ? canvas.nodes.map((node) => normalizeFlowNode(node as FlowNode))
+      : [],
+    edges: Array.isArray(canvas.edges) ? (canvas.edges as FlowEdge[]) : [],
+    viewport: {
+      x: canvas.viewport?.x ?? DEFAULT_VIEWPORT.x,
+      y: canvas.viewport?.y ?? DEFAULT_VIEWPORT.y,
+      zoom: canvas.viewport?.zoom ?? DEFAULT_VIEWPORT.zoom,
+    },
+  };
+}
+
+function toCanvasJson(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  viewport: ViewportState
+): CanvasJson {
+  return {
+    nodes,
+    edges,
+    viewport: {
+      x: viewport.x,
+      y: viewport.y,
+      zoom: viewport.zoom,
+    },
+  };
+}
+
+function getSchedulePayload(nodes: FlowNode[]): {
+  isScheduled: boolean;
+  cronExpression: string | null;
+} {
+  const scheduleNode = nodes.find(
+    (node) =>
+      node.type === "scheduleTrigger" || node.data?.type === "scheduleTrigger"
+  );
+
+  if (!scheduleNode) {
+    return { isScheduled: false, cronExpression: null };
+  }
+
+  const config = scheduleNode.data?.config as { cron?: string } | undefined;
+  const cronExpression = config?.cron?.trim() || null;
+
+  return {
+    isScheduled: true,
+    cronExpression,
+  };
+}
+
+function mapWorkflow(row: BackendWorkflow): Workflow {
+  const createdAt = row.created_at ?? row.createdAt ?? new Date().toISOString();
+  const updatedAt = row.updated_at ?? row.updatedAt ?? createdAt;
+  const canvas = parseCanvasJson(row.canvas_json);
+
+  return {
+    id: String(row.id),
+    name: String(row.name ?? "Untitled Workflow"),
+    description: String(row.description ?? ""),
+    nodes: canvas.nodes,
+    edges: canvas.edges,
+    viewport: canvas.viewport,
+    createdAt: String(createdAt),
+    updatedAt: String(updatedAt),
+  };
 }
 
 export const workflowApi = {
   async getAll(): Promise<Workflow[]> {
-    await delay(300);
-    return getWorkflows().sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+    try {
+      const { data } = await api.get<ListWorkflowsResponse>("/api/v1/workflow/");
+      const rows = Array.isArray(data.data) ? data.data : [];
+      return rows
+        .map(mapWorkflow)
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+    } catch (error) {
+      throw new Error(getErrorMessage(error, "Failed to load workflows"));
+    }
+  },
+
+  async getCanvas(canvasId: string): Promise<Workflow> {
+    try {
+      const { data } = await api.get<GetCanvasResponse>("/api/v1/workflow/canvas", {
+        params: { canvasId },
+      });
+
+      if (!data?.success || !data.data) {
+        throw new Error(data?.message ?? "Canvas not found");
+      }
+
+      return mapWorkflow(data.data);
+    } catch (error) {
+      throw new Error(getErrorMessage(error, "Failed to load canvas"));
+    }
   },
 
   async getById(id: string): Promise<Workflow | null> {
-    await delay(200);
-    return getWorkflows().find((w) => w.id === id) ?? null;
-  },
-
-  async create(name = "Untitled Workflow"): Promise<Workflow> {
-    await delay(300);
-    const now = new Date().toISOString();
-    const workflow: Workflow = {
-      id: uuidv4(),
-      name,
-      nodes: [],
-      edges: [],
-      viewport: { ...DEFAULT_VIEWPORT },
-      createdAt: now,
-      updatedAt: now,
-    };
-    const workflows = getWorkflows();
-    saveWorkflows([workflow, ...workflows]);
-    return workflow;
-  },
-
-  async update(id: string, data: Partial<Workflow>): Promise<Workflow> {
-    await delay(200);
-    const workflows = getWorkflows();
-    const index = workflows.findIndex((w) => w.id === id);
-
-    if (index === -1) {
-      throw new Error("Workflow not found");
+    try {
+      return await this.getCanvas(id);
+    } catch {
+      return null;
     }
+  },
 
-    const updated: Workflow = {
-      ...workflows[index],
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
+  async create(name: string, description = ""): Promise<Workflow> {
+    try {
+      const { data } = await api.post<CreateWorkflowResponse>(
+        "/api/v1/workflow/create",
+        {
+          name,
+          description: description || undefined,
+        }
+      );
 
-    workflows[index] = updated;
-    saveWorkflows(workflows);
-    return updated;
+      if (!data?.data) {
+        throw new Error(data?.message ?? "Failed to create workflow");
+      }
+
+      return mapWorkflow(data.data);
+    } catch (error) {
+      throw new Error(getErrorMessage(error, "Failed to create workflow"));
+    }
+  },
+
+  async updateCanvas(
+    canvasId: string,
+    canvas: {
+      nodes: FlowNode[];
+      edges: FlowEdge[];
+      viewport: ViewportState;
+    }
+  ): Promise<void> {
+    try {
+      const { isScheduled, cronExpression } = getSchedulePayload(canvas.nodes);
+
+      const { data } = await api.patch<UpdateCanvasResponse>(
+        "/api/v1/workflow/updateCanvas",
+        {
+          canvasId,
+          canvasJson: toCanvasJson(canvas.nodes, canvas.edges, canvas.viewport),
+          isScheduled,
+          cronExpression,
+        }
+      );
+
+      if (data && data.success === false) {
+        throw new Error(data.message ?? "Failed to update canvas");
+      }
+    } catch (error) {
+      throw new Error(getErrorMessage(error, "Failed to update canvas"));
+    }
+  },
+
+  async execute(workflowId: string): Promise<unknown> {
+    try {
+      const { data } = await api.post<{
+        success: boolean;
+        message?: string;
+        data?: unknown;
+      }>(`/api/v1/workflow/${workflowId}/execute`);
+
+      if (!data?.success) {
+        throw new Error(data?.message ?? "Workflow execution failed");
+      }
+
+      return data.data;
+    } catch (error) {
+      throw new Error(getErrorMessage(error, "Failed to execute workflow"));
+    }
   },
 
   async duplicate(id: string): Promise<Workflow> {
-    await delay(300);
-    const workflows = getWorkflows();
-    const original = workflows.find((w) => w.id === id);
-
-    if (!original) {
-      throw new Error("Workflow not found");
-    }
-
-    const now = new Date().toISOString();
-    const duplicated: Workflow = {
-      ...structuredClone(original),
-      id: uuidv4(),
-      name: `${original.name} (Copy)`,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    saveWorkflows([duplicated, ...workflows]);
-    return duplicated;
+    void id;
+    throw new Error("Duplicating workflows is not supported by the API yet");
   },
 
   async delete(id: string): Promise<void> {
-    await delay(200);
-    const workflows = getWorkflows().filter((w) => w.id !== id);
-    saveWorkflows(workflows);
+    void id;
+    throw new Error("Deleting workflows is not supported by the API yet");
   },
 };

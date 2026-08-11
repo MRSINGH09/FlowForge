@@ -92,7 +92,9 @@ export const WorkflowCanvas = memo(function WorkflowCanvas() {
         nodeTypes={nodeTypes}
         isValidConnection={isConnectionValid}
         fitView
-        deleteKeyCode={["Backspace", "Delete"]}
+        deleteKeyCode={["Delete"]}
+        multiSelectionKeyCode={["Meta", "Shift"]}
+        selectionKeyCode={["Shift"]}
         className="bg-background"
         proOptions={{ hideAttribution: true }}
       >

@@ -8,8 +8,7 @@ interface WorkflowState {
   error: string | null;
   searchQuery: string;
   fetchWorkflows: () => Promise<void>;
-  createWorkflow: (name?: string) => Promise<Workflow>;
-  updateWorkflow: (id: string, data: Partial<Workflow>) => Promise<void>;
+  createWorkflow: (name: string, description?: string) => Promise<Workflow>;
   renameWorkflow: (id: string, name: string) => Promise<void>;
   duplicateWorkflow: (id: string) => Promise<Workflow>;
   deleteWorkflow: (id: string) => Promise<void>;
@@ -37,37 +36,35 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     }
   },
 
-  createWorkflow: async (name) => {
-    const workflow = await workflowApi.create(name);
+  createWorkflow: async (name, description = "") => {
+    const workflow = await workflowApi.create(name, description);
     set((state) => ({ workflows: [workflow, ...state.workflows] }));
     return workflow;
   },
 
-  updateWorkflow: async (id, data) => {
-    const updated = await workflowApi.update(id, data);
+  renameWorkflow: async (id, name) => {
+    // Name update API is not available yet — keep local list label only.
     set((state) => ({
-      workflows: state.workflows.map((w) => (w.id === id ? updated : w)),
+      workflows: state.workflows.map((workflow) =>
+        workflow.id === id
+          ? { ...workflow, name, updatedAt: new Date().toISOString() }
+          : workflow
+      ),
     }));
   },
 
-  renameWorkflow: async (id, name) => {
-    await get().updateWorkflow(id, { name });
-  },
-
   duplicateWorkflow: async (id) => {
-    const duplicated = await workflowApi.duplicate(id);
-    set((state) => ({ workflows: [duplicated, ...state.workflows] }));
-    return duplicated;
+    return workflowApi.duplicate(id);
   },
 
   deleteWorkflow: async (id) => {
     await workflowApi.delete(id);
     set((state) => ({
-      workflows: state.workflows.filter((w) => w.id !== id),
+      workflows: state.workflows.filter((workflow) => workflow.id !== id),
     }));
   },
 
-  getWorkflow: (id) => get().workflows.find((w) => w.id === id),
+  getWorkflow: (id) => get().workflows.find((workflow) => workflow.id === id),
 
   setSearchQuery: (query) => set({ searchQuery: query }),
   clearError: () => set({ error: null }),
@@ -76,5 +73,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 export const selectFilteredWorkflows = (state: WorkflowState): Workflow[] => {
   const query = state.searchQuery.toLowerCase().trim();
   if (!query) return state.workflows;
-  return state.workflows.filter((w) => w.name.toLowerCase().includes(query));
+
+  return state.workflows.filter((workflow) => {
+    const name = (workflow.name ?? "").toLowerCase();
+    const description = (workflow.description ?? "").toLowerCase();
+    return name.includes(query) || description.includes(query);
+  });
 };

@@ -50,6 +50,21 @@ export function ConfigurationPanel() {
   const definition = getNodeDefinition(selectedNode.data.type);
   const ConfigComponent = configForms[selectedNode.data.type];
 
+  if (!definition || !ConfigComponent) {
+    return (
+      <div className="hidden w-80 shrink-0 flex-col border-l border-border bg-card lg:flex">
+        <div className="flex flex-1 items-center justify-center p-6 text-center">
+          <div>
+            <p className="text-sm font-medium">Unsupported node</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This node type cannot be configured
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const categoryVariant =
     definition.category === "trigger"
       ? "trigger"

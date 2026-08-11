@@ -10,7 +10,12 @@ interface AuthState {
   error: string | null;
   isHydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  signup: (
+    name: string,
+    email: string,
+    password: string,
+    confirmPassword: string
+  ) => Promise<void>;
   logout: () => void;
   clearError: () => void;
   setHydrated: () => void;
@@ -38,10 +43,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      signup: async (name, email, password) => {
+      signup: async (name, email, password, confirmPassword) => {
         set({ isLoading: true, error: null });
         try {
-          const session = await authApi.signup(name, email, password);
+          const session = await authApi.signup(name, email, password, confirmPassword);
           set({ session, isLoading: false });
         } catch (error) {
           set({

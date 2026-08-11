@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm, type DefaultValues } from "react-hook-form";
+import { useEffect, useRef } from "react";
+import { useForm, type DefaultValues, type FieldValues, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Label } from "@/components/ui/label";
@@ -17,32 +17,40 @@ import {
 import type { NodeConfig, NodeType } from "@/types";
 import { useCanvasStore } from "@/store/canvasStore";
 
-interface ConfigFormProps<T extends NodeConfig> {
+interface ConfigFormProps<T extends NodeConfig & FieldValues> {
   nodeId: string;
   schema: z.ZodType<T>;
   defaultValues: T;
-  children: (form: ReturnType<typeof useForm<T>>) => React.ReactNode;
+  children: (form: UseFormReturn<T>) => React.ReactNode;
 }
 
-export function ConfigForm<T extends NodeConfig>({
+export function ConfigForm<T extends NodeConfig & FieldValues>({
   nodeId,
   schema,
   defaultValues,
   children,
 }: ConfigFormProps<T>) {
   const updateNodeConfig = useCanvasStore((s) => s.updateNodeConfig);
+  const skipNextWatchRef = useRef(false);
 
   const form = useForm<T>({
     resolver: zodResolver(schema),
     defaultValues: defaultValues as DefaultValues<T>,
   });
 
+  // Only reset when switching nodes — not on every store update from typing.
   useEffect(() => {
-    form.reset(defaultValues);
-  }, [nodeId, defaultValues, form]);
+    skipNextWatchRef.current = true;
+    form.reset(defaultValues as DefaultValues<T>);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on node switch
+  }, [nodeId]);
 
   useEffect(() => {
     const subscription = form.watch((values) => {
+      if (skipNextWatchRef.current) {
+        skipNextWatchRef.current = false;
+        return;
+      }
       updateNodeConfig(nodeId, values as NodeConfig);
     });
     return () => subscription.unsubscribe();

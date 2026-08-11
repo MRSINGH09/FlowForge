@@ -9,13 +9,16 @@ export const NotificationNode = memo(function NotificationNode(
   props: NodeProps<FlowNode>
 ) {
   const config = props.data.config as NotificationConfig;
+  const subtitle =
+    config.channel === "email"
+      ? `email: ${config.to || config.subject || "unset"}`
+      : config.channel === "slack"
+        ? `slack: ${config.slackChannel || config.title || "unset"}`
+        : `webhook: ${config.method ?? "POST"}`;
+
   return (
     <>
-      <BaseNode
-        {...props}
-        icon="Bell"
-        subtitle={`${config.channel}: ${config.title}`}
-      />
+      <BaseNode {...props} icon="Bell" subtitle={subtitle} />
       <NodeHandles />
     </>
   );

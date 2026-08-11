@@ -125,14 +125,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   updateNodeConfig: (nodeId, config) => {
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.id === nodeId
-          ? { ...node, data: { ...node.data, config } }
-          : node
-      ),
-      isDirty: true,
-    }));
+    set((state) => {
+      const current = state.nodes.find((node) => node.id === nodeId);
+      if (!current) return state;
+
+      const prev = current.data.config as Record<string, unknown>;
+      const next = config as Record<string, unknown>;
+      const unchanged =
+        prev &&
+        next &&
+        Object.keys(next).every((key) => prev[key] === next[key]) &&
+        Object.keys(prev).length === Object.keys(next).length;
+
+      if (unchanged) return state;
+
+      return {
+        nodes: state.nodes.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, config } }
+            : node
+        ),
+        isDirty: true,
+      };
+    });
   },
 
   deleteSelectedNode: () => {

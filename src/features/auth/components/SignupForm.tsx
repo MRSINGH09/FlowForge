@@ -31,7 +31,7 @@ export function SignupForm() {
   const onSubmit = async (data: SignupFormData) => {
     clearError();
     try {
-      await signup(data.name, data.email, data.password);
+      await signup(data.name, data.email, data.password, data.confirmPassword);
       router.push(ROUTES.WORKFLOWS);
     } catch {
       // error handled in store

@@ -29,6 +29,7 @@ export interface ViewportState extends Viewport {
 export interface Workflow {
   id: string;
   name: string;
+  description: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
   viewport: ViewportState;
@@ -77,9 +78,21 @@ export interface DelayConfig {
 }
 
 export interface NotificationConfig {
+  channel: "email" | "slack" | "webhook";
   title: string;
   message: string;
-  channel: "email" | "slack" | "webhook";
+  /** Email subject line (used by backend email channel) */
+  subject?: string;
+  /** Email recipient */
+  to?: string;
+  /** Slack incoming webhook URL or channel */
+  slackWebhookUrl?: string;
+  slackChannel?: string;
+  /** Webhook / HTTP-style delivery */
+  url?: string;
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  headers?: string;
+  body?: string;
 }
 
 export interface IfConditionConfig {

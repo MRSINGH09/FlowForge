@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ROUTES } from "@/constants";
 import { useCanvasStore } from "@/store/canvasStore";
-import { useWorkflowStore } from "@/store/workflowStore";
+import { workflowApi } from "@/features/workflow/api/workflowApi";
 
 export function EditorHeader() {
   const router = useRouter();
@@ -22,33 +22,20 @@ export function EditorHeader() {
   const setWorkflowName = useCanvasStore((s) => s.setWorkflowName);
   const setIsSaving = useCanvasStore((s) => s.setIsSaving);
   const markClean = useCanvasStore((s) => s.markClean);
-  const updateWorkflow = useWorkflowStore((s) => s.updateWorkflow);
 
   const handleSave = useCallback(async () => {
     if (!workflowId) return;
 
     setIsSaving(true);
     try {
-      await updateWorkflow(workflowId, {
-        name: workflowName,
-        nodes,
-        edges,
-        viewport,
-      });
+      await workflowApi.updateCanvas(workflowId, { nodes, edges, viewport });
       markClean();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Failed to save canvas");
     } finally {
       setIsSaving(false);
     }
-  }, [
-    workflowId,
-    workflowName,
-    nodes,
-    edges,
-    viewport,
-    updateWorkflow,
-    setIsSaving,
-    markClean,
-  ]);
+  }, [workflowId, nodes, edges, viewport, setIsSaving, markClean]);
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-4">
