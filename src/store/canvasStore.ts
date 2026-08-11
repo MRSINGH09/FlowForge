@@ -127,13 +127,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   updateNodeConfig: (nodeId, config) => {
     set((state) => {
       const current = state.nodes.find((node) => node.id === nodeId);
-      if (!current) return state;
-      console.log(current, config, "current");
-      const prev = current.data.config as Record<string, any> | undefined;
-      const next = config as Record<string, any> | undefined;
+      if (!current) return state; ``
+
+      const prev = current.data.config as unknown as Record<string, unknown>;
+      const next = config as unknown as Record<string, unknown>;
       const unchanged =
-        prev &&
-        next &&
         Object.keys(next).every((key) => prev[key] === next[key]) &&
         Object.keys(prev).length === Object.keys(next).length;
 
