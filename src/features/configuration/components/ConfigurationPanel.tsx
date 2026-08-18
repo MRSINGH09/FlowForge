@@ -3,7 +3,6 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Drawer, DrawerContent, DrawerHeader } from "@/components/drawer";
 import { selectSelectedNode, useCanvasStore } from "@/store/canvasStore";
 import { getNodeDefinition } from "@/features/nodes/utils/nodeRegistry";
 import { ManualTriggerConfigForm } from "@/features/configuration/components/ManualTriggerConfigForm";
@@ -14,6 +13,7 @@ import { DelayConfigForm } from "@/features/configuration/components/DelayConfig
 import { NotificationConfigForm } from "@/features/configuration/components/NotificationConfigForm";
 import { IfConditionConfigForm } from "@/features/configuration/components/IfConditionConfigForm";
 import type { FlowNode, NodeType } from "@/types";
+import { cn } from "@/lib/utils";
 
 type ConfigFormComponent = React.ComponentType<{ node: FlowNode }>;
 
@@ -27,6 +27,25 @@ const configForms: Record<NodeType, ConfigFormComponent> = {
   ifCondition: IfConditionConfigForm,
 };
 
+function PanelShell({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <aside
+      className={cn(
+        "flex w-80 shrink-0 flex-col border-l border-border bg-card",
+        className
+      )}
+    >
+      {children}
+    </aside>
+  );
+}
+
 export function ConfigurationPanel() {
   const selectedNode = useCanvasStore(selectSelectedNode);
   const setSelectedNodeId = useCanvasStore((s) => s.setSelectedNodeId);
@@ -34,7 +53,7 @@ export function ConfigurationPanel() {
 
   if (!selectedNode) {
     return (
-      <div className="hidden w-80 shrink-0 flex-col border-l border-border bg-card lg:flex">
+      <PanelShell className="hidden lg:flex">
         <div className="flex flex-1 items-center justify-center p-6 text-center">
           <div>
             <p className="text-sm font-medium">No node selected</p>
@@ -43,7 +62,7 @@ export function ConfigurationPanel() {
             </p>
           </div>
         </div>
-      </div>
+      </PanelShell>
     );
   }
 
@@ -52,7 +71,7 @@ export function ConfigurationPanel() {
 
   if (!definition || !ConfigComponent) {
     return (
-      <div className="hidden w-80 shrink-0 flex-col border-l border-border bg-card lg:flex">
+      <PanelShell className="hidden lg:flex">
         <div className="flex flex-1 items-center justify-center p-6 text-center">
           <div>
             <p className="text-sm font-medium">Unsupported node</p>
@@ -61,7 +80,7 @@ export function ConfigurationPanel() {
             </p>
           </div>
         </div>
-      </div>
+      </PanelShell>
     );
   }
 
@@ -73,29 +92,29 @@ export function ConfigurationPanel() {
         : "action";
 
   return (
-    <Drawer open className="hidden w-80 shrink-0 lg:flex">
-      <DrawerHeader>
-        <div className="flex items-center gap-2">
+    <PanelShell>
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <Badge variant={categoryVariant}>{definition.category}</Badge>
-          <h3 className="flex-1 truncate text-sm font-semibold">{selectedNode.data.label}</h3>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setSelectedNodeId(null)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <h3 className="truncate text-sm font-semibold">{selectedNode.data.label}</h3>
         </div>
-      </DrawerHeader>
-      <DrawerContent>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={() => setSelectedNodeId(null)}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4">
         <ConfigComponent node={selectedNode} />
         <div className="mt-6 border-t border-border pt-4">
           <Button variant="destructive" size="sm" onClick={deleteSelectedNode}>
             Delete Node
           </Button>
         </div>
-      </DrawerContent>
-    </Drawer>
+      </div>
+    </PanelShell>
   );
 }

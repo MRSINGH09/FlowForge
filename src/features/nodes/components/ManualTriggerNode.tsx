@@ -18,6 +18,7 @@ export const ManualTriggerNode = memo(function ManualTriggerNode(
 
   const workflowId = useCanvasStore((s) => s.workflowId);
   const isDirty = useCanvasStore((s) => s.isDirty);
+  const isActive = useCanvasStore((s) => s.isActive);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -30,7 +31,12 @@ export const ManualTriggerNode = memo(function ManualTriggerNode(
     setIsExecuting(true);
     try {
       if (isDirty) {
-        await workflowApi.updateCanvas(workflowId, { nodes, edges, viewport });
+        await workflowApi.updateCanvas(workflowId, {
+          nodes,
+          edges,
+          viewport,
+          isActive,
+        });
         markClean();
       }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { PageLoading } from "@/components/loading-spinner";
 import { ErrorState } from "@/components/error-state";
@@ -22,11 +22,9 @@ export function WorkflowEditor() {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
-    hasLoadedRef.current = false;
 
     async function load() {
       setIsLoading(true);
@@ -37,8 +35,14 @@ export function WorkflowEditor() {
         if (!mounted) return;
 
         setWorkflow(data);
-        initCanvas(data.id, data.name, data.nodes, data.edges, data.viewport);
-        hasLoadedRef.current = true;
+        initCanvas(
+          data.id,
+          data.name,
+          data.nodes,
+          data.edges,
+          data.viewport,
+          data.isActive
+        );
       } catch (err) {
         if (mounted) {
           setError(err instanceof Error ? err.message : "Failed to load workflow");
@@ -54,21 +58,6 @@ export function WorkflowEditor() {
 
     return () => {
       mounted = false;
-
-      if (hasLoadedRef.current) {
-        const {
-          workflowId: canvasId,
-          isDirty,
-          nodes,
-          edges,
-          viewport,
-        } = useCanvasStore.getState();
-
-        if (canvasId && isDirty) {
-          void workflowApi.updateCanvas(canvasId, { nodes, edges, viewport });
-        }
-      }
-
       resetCanvas();
     };
   }, [workflowId, initCanvas, resetCanvas]);

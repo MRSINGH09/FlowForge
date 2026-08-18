@@ -33,6 +33,9 @@ export interface Workflow {
   nodes: FlowNode[];
   edges: FlowEdge[];
   viewport: ViewportState;
+  isActive: boolean;
+  isScheduled: boolean;
+  cronExpression: string | null;
   createdAt: string;
   updatedAt: string;
 }

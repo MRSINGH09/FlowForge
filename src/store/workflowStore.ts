@@ -9,8 +9,10 @@ interface WorkflowState {
   searchQuery: string;
   fetchWorkflows: () => Promise<void>;
   createWorkflow: (name: string, description?: string) => Promise<Workflow>;
-  renameWorkflow: (id: string, name: string) => Promise<void>;
-  duplicateWorkflow: (id: string) => Promise<Workflow>;
+  updateWorkflowDetails: (
+    id: string,
+    details: { name: string; description: string }
+  ) => Promise<void>;
   deleteWorkflow: (id: string) => Promise<void>;
   getWorkflow: (id: string) => Workflow | undefined;
   setSearchQuery: (query: string) => void;
@@ -42,19 +44,20 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     return workflow;
   },
 
-  renameWorkflow: async (id, name) => {
-    // Name update API is not available yet — keep local list label only.
+  updateWorkflowDetails: async (id, details) => {
+    const updated = await workflowApi.updateDetails(id, details);
     set((state) => ({
       workflows: state.workflows.map((workflow) =>
         workflow.id === id
-          ? { ...workflow, name, updatedAt: new Date().toISOString() }
+          ? {
+              ...workflow,
+              name: updated.name,
+              description: updated.description,
+              updatedAt: updated.updatedAt,
+            }
           : workflow
       ),
     }));
-  },
-
-  duplicateWorkflow: async (id) => {
-    return workflowApi.duplicate(id);
   },
 
   deleteWorkflow: async (id) => {

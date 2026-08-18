@@ -25,8 +25,7 @@ export function WorkflowDashboard() {
   const setSearchQuery = useWorkflowStore((s) => s.setSearchQuery);
   const fetchWorkflows = useWorkflowStore((s) => s.fetchWorkflows);
   const createWorkflow = useWorkflowStore((s) => s.createWorkflow);
-  const renameWorkflow = useWorkflowStore((s) => s.renameWorkflow);
-  const duplicateWorkflow = useWorkflowStore((s) => s.duplicateWorkflow);
+  const updateWorkflowDetails = useWorkflowStore((s) => s.updateWorkflowDetails);
   const deleteWorkflow = useWorkflowStore((s) => s.deleteWorkflow);
   const clearError = useWorkflowStore((s) => s.clearError);
 
@@ -105,8 +104,7 @@ export function WorkflowDashboard() {
             <WorkflowCard
               key={workflow.id}
               workflow={workflow}
-              onRename={renameWorkflow}
-              onDuplicate={duplicateWorkflow}
+              onUpdateDetails={updateWorkflowDetails}
               onDelete={deleteWorkflow}
             />
           ))}

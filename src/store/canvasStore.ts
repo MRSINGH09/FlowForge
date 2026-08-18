@@ -23,9 +23,17 @@ interface CanvasState {
   isDirty: boolean;
   workflowId: string | null;
   workflowName: string;
+  isActive: boolean;
   isSaving: boolean;
 
-  initCanvas: (workflowId: string, name: string, nodes: FlowNode[], edges: FlowEdge[], viewport: ViewportState) => void;
+  initCanvas: (
+    workflowId: string,
+    name: string,
+    nodes: FlowNode[],
+    edges: FlowEdge[],
+    viewport: ViewportState,
+    isActive?: boolean
+  ) => void;
   resetCanvas: () => void;
   onNodesChange: OnNodesChange<FlowNode>;
   onEdgesChange: OnEdgesChange;
@@ -38,6 +46,7 @@ interface CanvasState {
   setSelectedNodeId: (id: string | null) => void;
   setViewport: (viewport: ViewportState) => void;
   setWorkflowName: (name: string) => void;
+  setIsActive: (isActive: boolean) => void;
   setIsSaving: (saving: boolean) => void;
   markClean: () => void;
   markDirty: () => void;
@@ -56,15 +65,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   isDirty: false,
   workflowId: null,
   workflowName: "Untitled Workflow",
+  isActive: true,
   isSaving: false,
 
-  initCanvas: (workflowId, name, nodes, edges, viewport) => {
+  initCanvas: (workflowId, name, nodes, edges, viewport, isActive = true) => {
     set({
       workflowId,
       workflowName: name,
       nodes,
       edges,
       viewport,
+      isActive,
       selectedNodeId: null,
       isDirty: false,
     });
@@ -81,6 +92,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       isDirty: false,
       workflowId: null,
       workflowName: "Untitled Workflow",
+      isActive: true,
       isSaving: false,
     }),
 
@@ -127,7 +139,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   updateNodeConfig: (nodeId, config) => {
     set((state) => {
       const current = state.nodes.find((node) => node.id === nodeId);
-      if (!current) return state; ``
+      if (!current) return state;
 
       const prev = current.data.config as unknown as Record<string, unknown>;
       const next = config as unknown as Record<string, unknown>;
@@ -164,8 +176,20 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   setSelectedNodeId: (id) => set({ selectedNodeId: id }),
-  setViewport: (viewport) => set({ viewport, isDirty: true }),
+  setViewport: (viewport) => {
+    const current = get().viewport;
+    if (
+      current.x === viewport.x &&
+      current.y === viewport.y &&
+      current.zoom === viewport.zoom
+    ) {
+      return;
+    }
+    // Viewport changes (including DevTools resize) should not mark the canvas dirty.
+    set({ viewport });
+  },
   setWorkflowName: (name) => set({ workflowName: name, isDirty: true }),
+  setIsActive: (isActive) => set({ isActive, isDirty: true }),
   setIsSaving: (saving) => set({ isSaving: saving }),
   markClean: () => set({ isDirty: false }),
   markDirty: () => set({ isDirty: true }),

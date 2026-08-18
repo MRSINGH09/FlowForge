@@ -15,6 +15,12 @@ interface BackendWorkflow {
   name: string;
   description?: string | null;
   canvas_json?: CanvasJson | string | null;
+  is_active?: boolean | null;
+  isActive?: boolean | null;
+  is_scheduled?: boolean | null;
+  isScheduled?: boolean | null;
+  cron_expression?: string | null;
+  cronExpression?: string | null;
   created_at?: string;
   updated_at?: string;
   createdAt?: string;
@@ -186,6 +192,7 @@ function mapWorkflow(row: BackendWorkflow): Workflow {
   const createdAt = row.created_at ?? row.createdAt ?? new Date().toISOString();
   const updatedAt = row.updated_at ?? row.updatedAt ?? createdAt;
   const canvas = parseCanvasJson(row.canvas_json);
+  const cronExpression = row.cron_expression ?? row.cronExpression ?? null;
 
   return {
     id: String(row.id),
@@ -194,6 +201,9 @@ function mapWorkflow(row: BackendWorkflow): Workflow {
     nodes: canvas.nodes,
     edges: canvas.edges,
     viewport: canvas.viewport,
+    isActive: Boolean(row.is_active ?? row.isActive ?? true),
+    isScheduled: Boolean(row.is_scheduled ?? row.isScheduled ?? false),
+    cronExpression,
     createdAt: String(createdAt),
     updatedAt: String(updatedAt),
   };
@@ -265,6 +275,7 @@ export const workflowApi = {
       nodes: FlowNode[];
       edges: FlowEdge[];
       viewport: ViewportState;
+      isActive?: boolean;
     }
   ): Promise<void> {
     try {
@@ -275,6 +286,7 @@ export const workflowApi = {
         {
           canvasId,
           canvasJson: toCanvasJson(canvas.nodes, canvas.edges, canvas.viewport),
+          isActive: canvas.isActive ?? true,
           isScheduled,
           cronExpression,
         }
@@ -306,13 +318,58 @@ export const workflowApi = {
     }
   },
 
-  async duplicate(id: string): Promise<Workflow> {
-    void id;
-    throw new Error("Duplicating workflows is not supported by the API yet");
+  async updateDetails(
+    workflowId: string,
+    details: { name: string; description: string }
+  ): Promise<Workflow> {
+    try {
+      const { data } = await api.patch<{
+        success: boolean;
+        message?: string;
+        data?: BackendWorkflow;
+      }>(`/api/v1/workflow/${workflowId}/updateWorkflowDetails`, {
+        name: details.name,
+        description: details.description,
+      });
+
+      if (!data?.success) {
+        throw new Error(data?.message ?? "Failed to update workflow details");
+      }
+
+      if (data.data) {
+        return mapWorkflow(data.data);
+      }
+
+      return {
+        id: workflowId,
+        name: details.name,
+        description: details.description,
+        nodes: [],
+        edges: [],
+        viewport: { ...DEFAULT_VIEWPORT },
+        isActive: true,
+        isScheduled: false,
+        cronExpression: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new Error(getErrorMessage(error, "Failed to update workflow details"));
+    }
   },
 
   async delete(id: string): Promise<void> {
-    void id;
-    throw new Error("Deleting workflows is not supported by the API yet");
+    try {
+      const { data } = await api.delete<{
+        success: boolean;
+        message?: string;
+      }>(`/api/v1/workflow/${id}/delete`);
+
+      if (data && data.success === false) {
+        throw new Error(data.message ?? "Failed to delete workflow");
+      }
+    } catch (error) {
+      throw new Error(getErrorMessage(error, "Failed to delete workflow"));
+    }
   },
 };
